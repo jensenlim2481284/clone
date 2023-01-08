@@ -28,6 +28,25 @@ if (ZapparThree.browserIncompatible()) {
 // your own loading UI - it's up to you :-)
 const manager = new ZapparThree.LoadingManager();
 
+const SpeechRecognition = window.SpeechRecognition || webkitSpeechRecognition;
+const SpeechGrammarList = window.SpeechGrammarList || webkitSpeechGrammarList;
+const SpeechRecognitionEvent = window.SpeechRecognitionEvent || webkitSpeechRecognitionEvent;
+
+const recognition = new SpeechRecognition();
+const speechRecognitionList = new SpeechGrammarList();
+
+const colors = [ 'Hi', 'Hey', 'Hello' ];
+const grammar = `#JSGF V1.0; grammar hello; public <color> = ${colors.join(' | ')};`
+speechRecognitionList.addFromString(grammar, 1);
+recognition.grammars = speechRecognitionList;
+recognition.continuous = false;
+recognition.lang = 'en-US';
+recognition.interimResults = false;
+recognition.maxAlternatives = 1;
+
+
+recognition.start()
+
 // Construct our ThreeJS renderer and scene as usual
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 const scene = new THREE.Scene();
@@ -69,15 +88,15 @@ scene.add(instantTrackerGroup);
 // Load a 3D model to place within our group (using ThreeJS's GLTF loader)
 // Pass our loading manager in to ensure the progress bar works correctly
 const gltfLoader = new GLTFLoader(manager);
-
 gltfLoader.load(model, (gltf) => {
   // Now the model has been loaded, we can add it to our instant_tracker_group
 	gltf.scene.scale.multiplyScalar(1 /10); // adjust scalar factor to match your scene scale
-      
   instantTrackerGroup.add(gltf.scene);
+  
 }, undefined, () => {
   console.log('An error ocurred loading the GLTF model');
 });
+
 
 // Let's add some lighting, first a directional light above the model pointing down
 const directionalLight = new THREE.DirectionalLight('white', 0.8);
@@ -94,18 +113,44 @@ instantTrackerGroup.add(ambientLight);
 // The user can confirm the location by tapping on the screen
 let hasPlaced = true;
 
-setTimeout(function(){
-  var x = document.getElementById("player");
-  x.autoplay = true;
-  x.load();
-}, 10000);
 
 
-instantTrackerGroup.setAnchorPoseFromCameraOffset(0, -10, -30);
+instantTrackerGroup.setAnchorPoseFromCameraOffset(0, -10, -25);
+
+let track = 1;
+recognition.onresult = (event) => {
+  let word = event.results[0][0].transcript
+  console.log(word);
+  switch(word){
+    case 'hi':
+    case 'hey':
+    case 'hello':
+      track = 0;
+    break;
+  }
+  recognition.onerror = function (event) {};
+  recognition.onend = function() {
+      recognition.start();
+  };
+}
 
 
 // Use a function to render our scene as usual
 function render(): void {
+
+  if(track == 0){
+
+    if(instantTrackerGroup.children[2]  && instantTrackerGroup.children[2].rotation.y < 0.5){
+      instantTrackerGroup.children[2].rotation.y += 0.05;
+    }
+    else if(instantTrackerGroup.children[2]  && instantTrackerGroup.children[2].rotation.y >= 0.5){
+      track = 1;
+      var x = document.getElementById("player");
+      x.autoplay = true;
+      x.load();
+    }
+
+  }
 
 
   // The Zappar camera must have updateFrame called every frame
